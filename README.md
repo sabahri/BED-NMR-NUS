@@ -8,7 +8,7 @@ Nonuniform sampling (NUS) is a technique for multidimensional NMR that reduces t
 
 Here we work on a Bayesian model that learns, during acquisition, which time points are most informative. It then adjusts the sampling trajectory using only the data collected so far.
 
-## Current Progress
+## Project Status
 
 This project currently simulates **1D acquisition**, intended to stand in for the indirect dimension of a 2D experiment. The pipeline generates a synthetic FID, adaptively selects sampling points by entropy, and reconstructs a spectrum.
 
@@ -58,13 +58,13 @@ $$p(w \mid y) = \mathcal{N}_{\mathbb{C}}(m, S), \qquad S = \left(\Phi^{\mathsf{H
 
 This is a known simplification: real spectra are sparse, and a Gaussian prior isn't the most realistic choice. However it keeps the posterior tractable in closed form. A more realistic sparsity-promoting prior is a natural next step once the framework is validated (see Worley reference below).
 
-**A side effect of this choice of prior:** the posterior covariance $S$ depends only on $\Phi$ (i.e., on *which* time points were sampled) and on $\lambda$, never on the measured values $y$. Only the posterior mean $m$ depends on $y$. This is a consequence of the model being linear-Gaussian, not a design goal — see the note at the end of section 2 below.
+**A side effect of this choice of prior:** the posterior covariance $S$ depends only on $\Phi$ (i.e., on *which* time points were sampled) and on $\lambda$, never on the measured values $y$. Only the posterior mean $m$ depends on $y$. This is a consequence of the model being linear-Gaussian, not a design goal.
 
 ### 2. Choosing new points by entropy
 
 Sampling starts with a handful of points chosen at random (via inverse-CDF sampling of an exponential-decay-weighted distribution, biasing early points toward short evolution times). From there, at each step the algorithm scores every unsampled candidate point $t^\star$ by how much it would reduce uncertainty about the spectrum.
 
-For a candidate $t^\star$, append its feature row to the design matrix, $\Phi^\star = \begin{bmatrix}\Phi \\ \phi(t^\star)^{\mathsf{T}}\end{bmatrix}$ (size $(N{+}1)\times D$), and compute the augmented weight-space posterior $S^\star = (\Phi^{\star\mathsf{H}}\Phi^\star + \lambda I)^{-1}$ (still $D \times D$). Mapping this through $\Phi^\star$ gives the predictive covariance over the outputs — sampled points and candidate together:
+For a candidate $t^\star$, append its feature row to the design matrix, $\Phi^\star = \begin{bmatrix}\Phi \\ \phi(t^\star)^{\mathsf{T}}\end{bmatrix}$ (size $(N{+}1)\times D$), and compute the augmented weight-space posterior $S^\star = (\Phi^{\star\mathsf{H}}\Phi^\star + \lambda I)^{-1}$ (still $D \times D$). Mapping this through $\Phi^\star$ gives the predictive covariance over the outputs, sampled points and candidate together:
 
 $$\Sigma_{\text{pred}} = \Phi^\star S^\star \Phi^{\star\mathsf{H}} + \sigma^2 I \qquad \text{(size } (N{+}1)\times(N{+}1)\text{)}$$
 
@@ -86,7 +86,7 @@ A consequence of this criterion: $\Sigma_{\text{pred}}$ (and therefore $\tilde{\
 
 This is a limitation of the current Gaussian-prior model, not the intent. The goal is for the history of measured intensities to actively shape which point gets sampled next e.g., a sparsity-promoting prior would make the posterior covariance depend on $y$ through the current estimate of which frequencies are actually present, so that measurements already taken determine how future ones are collected (see section 1's note on moving past the Gaussian prior).
 
-### 3. Modeling relaxation (partially implemented)
+### 3. Modeling relaxation
 
 Because NMR signal amplitude decays over the acquisition (T2 relaxation), an exponential decay envelope $A(t) = A_0 e^{-t/T_2}$ can be fit to the sampled magnitudes and folded into the predictive covariance, so that later, weaker time points aren't misjudged as more "informative" than they really are. This relaxation-weighted entropy is implemented as `T2kern_entropy()` in the notebook, but it is **not** the version currently used in the main sampling loop, which calls the plain, y-independent `Q()` from section 2 above. So relaxation is not yet actually affecting point selection in the results produced so far.
 
