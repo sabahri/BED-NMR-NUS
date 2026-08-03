@@ -74,7 +74,11 @@ $$H(t^\star) = \log(\pi e) + \log \tilde{\Sigma}(t^\star)$$
 
 The next point sampled is $t_{\text{next}} = \arg\max_{t^\star} H(t^\star)$ over the unsampled candidates. Equivalently, since $\log$ is increasing, the candidate with the largest predictive variance.
 
-This can equivalently be derived by appending the candidate's feature row to the design matrix, $\Phi^\star = \begin{bmatrix}\Phi \\ \phi(t^\star)^{\mathsf{T}}\end{bmatrix}$, forming the joint predictive covariance $\Sigma_{\text{pred}} = \Phi^\star S \Phi^{\star\mathsf{H}} + \sigma^2 I$ over sampled points and candidate together, and taking the Schur complement after partitioning into the sampled block, the candidate's own variance, and their cross-covariance. The two routes agree exactly, but the direct quadratic form above is cheaper and avoids an unnecessary $(N{+}1)\times(N{+}1)$ matrix.
+This can equivalently be derived by appending the candidate's feature row to the design matrix,
+
+$$\Phi^\star = \begin{bmatrix}\Phi \\ \phi(t^\star)^{\mathsf{T}}\end{bmatrix},$$
+
+forming the joint predictive covariance $\Sigma_{\text{pred}} = \Phi^\star S \Phi^{\star\mathsf{H}} + \sigma^2 I$ over sampled points and candidate together, and taking the Schur complement after partitioning into the sampled block, the candidate's own variance, and their cross-covariance. The two routes agree exactly, but the direct quadratic form above is cheaper and avoids an unnecessary $(N{+}1)\times(N{+}1)$ matrix.
 
 A consequence of this criterion: $\tilde{\Sigma}(t^\star)$ (and therefore $H$) is a function of $\Phi$ and $\phi(t^\star)$ alone, so it depends only on *which points have been sampled*, not on the actual measured values. In code this is `XSXT()`/`Q()`.
 
