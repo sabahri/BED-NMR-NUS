@@ -64,27 +64,23 @@ This is a known simplification: real spectra are sparse, and a Gaussian prior is
 
 Sampling starts with a handful of points chosen at random (via inverse-CDF sampling of an exponential-decay-weighted distribution, biasing early points toward short evolution times). From there, at each step the algorithm scores every unsampled candidate point $t^\star$ by how much it would reduce uncertainty about the spectrum.
 
-For a candidate $t^\star$, append its feature row to the design matrix, $\Phi^\star = \begin{bmatrix}\Phi \\ \phi(t^\star)^{\mathsf{T}}\end{bmatrix}$ (size $(N{+}1)\times D$), and compute the augmented weight-space posterior $S^\star = (\Phi^{\star\mathsf{H}}\Phi^\star + \lambda I)^{-1}$ (still $D \times D$). Mapping this through $\Phi^\star$ gives the predictive covariance over the outputs, sampled points and candidate together:
+The predictive distribution for a candidate $t^\star$ follows directly from the weight-space posterior $S$ in section 1: $S$ is built from the *sampled* points only, not the candidate. Since $y^\star = \phi(t^\star)^{\mathsf{T}}w + \varepsilon^\star$ is linear in $w$, its predictive variance is a single quadratic form:
 
-$$\Sigma_{\text{pred}} = \Phi^\star S^\star \Phi^{\star\mathsf{H}} + \sigma^2 I \qquad \text{(size } (N{+}1)\times(N{+}1)\text{)}$$
+$$\tilde{\Sigma}(t^\star) = \phi(t^\star)^{\mathsf{T}} S\, \overline{\phi(t^\star)} + \sigma^2$$
 
-Partitioning this into the block for the $N$ already-sampled points ($\Sigma_{\text{old}}$), the candidate's own variance ($\Sigma_u$), and their cross-covariance ($C$):
+and its entropy (complex scalar Gaussian) is:
 
-$$\Sigma_{\text{pred}} = \begin{bmatrix}\Sigma_{\text{old}} & C \\ C^{\mathsf{H}} & \Sigma_u\end{bmatrix}$$
+$$H(t^\star) = \log(\pi e) + \log \tilde{\Sigma}(t^\star)$$
 
-the conditional variance of the candidate given everything already sampled is the Schur complement:
+The next point sampled is $t_{\text{next}} = \arg\max_{t^\star} H(t^\star)$ over the unsampled candidates. Equivalently, since $\log$ is increasing, the candidate with the largest predictive variance.
 
-$$\tilde{\Sigma}(t^\star) = \Sigma_u - C^{\mathsf{H}}\Sigma_{\text{old}}^{-1}C$$
+This can equivalently be derived by appending the candidate's feature row to the design matrix, $\Phi^\star = \begin{bmatrix}\Phi \\ \phi(t^\star)^{\mathsf{T}}\end{bmatrix}$, forming the joint predictive covariance $\Sigma_{\text{pred}} = \Phi^\star S \Phi^{\star\mathsf{H}} + \sigma^2 I$ over sampled points and candidate together, and taking the Schur complement after partitioning into the sampled block, the candidate's own variance, and their cross-covariance. The two routes agree exactly, but the direct quadratic form above is cheaper and avoids an unnecessary $(N{+}1)\times(N{+}1)$ matrix.
 
-and its entropy (a scalar Gaussian) is:
-
-$$H(t^\star) = \tfrac{1}{2}(1 + \log 2\pi) + \tfrac{1}{2}\log|\tilde{\Sigma}(t^\star)|$$
-
-The next point sampled is $t_{\text{next}} = \arg\max_{t^\star} H(t^\star)$ over the unsampled candidates.
-
-A consequence of this criterion: $\Sigma_{\text{pred}}$ (and therefore $\tilde{\Sigma}$ and $H$) is a function of $\Phi^\star$ alone, so it depends only on *which points have been sampled*, not on the actual measured values. In code this is `XSXT()`/`Q()`.
+A consequence of this criterion: $\tilde{\Sigma}(t^\star)$ (and therefore $H$) is a function of $\Phi$ and $\phi(t^\star)$ alone, so it depends only on *which points have been sampled*, not on the actual measured values. In code this is `XSXT()`/`Q()`.
 
 This is a limitation of the current Gaussian-prior model, not the intent. The goal is for the history of measured intensities to actively shape which point gets sampled next e.g., a sparsity-promoting prior would make the posterior covariance depend on $y$ through the current estimate of which frequencies are actually present, so that measurements already taken determine how future ones are collected (see section 1's note on moving past the Gaussian prior).
+
+Under the equal-variance Gaussian prior above, on the full integer frequency grid, the feature vectors $\phi(t)$ for different sampled times are mutually orthogonal. That makes different measurements statistically independent, which collapses $\tilde{\Sigma}(t^\star)$ to the same constant value for every unsampled candidate. As a result, the criterion has nothing to discriminate on. In the current code, the `alpha` frequency-grid scaling factor is what breaks this orthogonality and gives the entropy landscape any structure at all. A better way is to break the symmetry deliberately: either per-component decay rates in $\phi(t)_d = e^{(i\omega_d - \rho_d)t}$, or the unequal-variance/sparsity-promoting prior already planned above.
 
 ### 3. Modeling relaxation
 
