@@ -5,3 +5,5 @@ DIANA_v9.docx
 ~$*.docx
 .DS_Store
 .ipynb_checkpoints/
+BED_NUS.py
+BED-NMR-NUS entropy section note.md
