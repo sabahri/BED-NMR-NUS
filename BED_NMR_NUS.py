@@ -21,6 +21,10 @@ from scipy.optimize import curve_fit
 import matplotlib.cm as cm
 np.random.seed(1234)
 
+# Per-iteration figures in the adaptive and random sampling loops (one window
+# per iteration). Off by default; the summary plots and heatmap are always shown.
+SHOW_ITERATION_PLOTS = False
+
 # %% [cell 1]
 # Simulate Data
 
@@ -620,24 +624,25 @@ for i in range(0, num_iters):
     
     T2_array[i] = T2_estimate
     
-    # Figure plotting    
-    fig, axs = pl.subplots(1,3, figsize=(15,5), gridspec_kw={'height_ratios': [1]})
+    if SHOW_ITERATION_PLOTS:
+        # Figure plotting    
+        fig, axs = pl.subplots(1,3, figsize=(15,5), gridspec_kw={'height_ratios': [1]})
     
-    axs[0].plot(np1,st1.real, c = 'b', lw='0.5',zorder=1)
-    axs[0].scatter(t_sampled, ys_post.real, c = 'lime', lw=0.5, edgecolor='k',alpha=0.5, zorder = 2)
-    axs[0].scatter(t_sampled, ys_sampled.real, c = 'r', lw=0.5, s=30, edgecolor='k', alpha=0.5, zorder=3)
-    #axs[0].plot(np1, envelope_estimate, 'k-', label=f'Envelope, T2 = ({T2_estimate:.1f})')
-    axs[0].set_xlabel("Time point")
+        axs[0].plot(np1,st1.real, c = 'b', lw='0.5',zorder=1)
+        axs[0].scatter(t_sampled, ys_post.real, c = 'lime', lw=0.5, edgecolor='k',alpha=0.5, zorder = 2)
+        axs[0].scatter(t_sampled, ys_sampled.real, c = 'r', lw=0.5, s=30, edgecolor='k', alpha=0.5, zorder=3)
+        #axs[0].plot(np1, envelope_estimate, 'k-', label=f'Envelope, T2 = ({T2_estimate:.1f})')
+        axs[0].set_xlabel("Time point")
     
     
-    axs[1].plot(ppm1,Sk1.real, c = 'b', zorder=1)
-    axs[1].plot(k_ppm1, m_post_scaled.real, c='r', zorder=2)
+        axs[1].plot(ppm1,Sk1.real, c = 'b', zorder=1)
+        axs[1].plot(k_ppm1, m_post_scaled.real, c='r', zorder=2)
     
-    axs[1].scatter(peaks_ppm, m_post_maxima[i,:], c = 'cyan', edgecolor = 'k', lw = 0.5, zorder = 3)
-    axs[1].set_xlabel("15N Chemical Shift (ppm)")
-    axs[1].set_xlim(100,130)
-    for omest in omsest_ppm:
-        axs[1].axvline(x=omest,c='r', linestyle = '--', alpha = 0.33)
+        axs[1].scatter(peaks_ppm, m_post_maxima[i,:], c = 'cyan', edgecolor = 'k', lw = 0.5, zorder = 3)
+        axs[1].set_xlabel("15N Chemical Shift (ppm)")
+        axs[1].set_xlim(100,130)
+        for omest in omsest_ppm:
+            axs[1].axvline(x=omest,c='r', linestyle = '--', alpha = 0.33)
     
     print("Iteration number:", i+1)
     print("Number of sampled points:", t_sampled.shape[0])
@@ -661,18 +666,20 @@ for i in range(0, num_iters):
         chosen_map.append((i, t_opt))
         #Q_opt = tstar_ent[t_opt_indices]
         #pthresh = dynamic_peaks(m_post, 8, Sk1_rms, pthresh)
-        axs[2].scatter(t_unsampled, Q_star, c = 'lime', lw = 0.5, edgecolor = 'k')
-        axs[2].scatter(t_opt, Q_opt, c = 'r', lw = 0.5, edgecolor = 'k')
-        axs[2].set_xlim(0,N1)
-        #axs[2].set_ylim(0,2)
+        if SHOW_ITERATION_PLOTS:
+            axs[2].scatter(t_unsampled, Q_star, c = 'lime', lw = 0.5, edgecolor = 'k')
+            axs[2].scatter(t_opt, Q_opt, c = 'r', lw = 0.5, edgecolor = 'k')
+            axs[2].set_xlim(0,N1)
+            #axs[2].set_ylim(0,2)
 
-        for i in t_sampled:
-            axs[2].axvline(x=i, c = 'b', linestyle = '--', lw = '0.5', alpha = 0.66, zorder = 1)
-            #axs[2].axvline(x=i, c = 'r', linestyle = '--', lw = '0.5', alpha = 0.66, zorder = 1)
+            for i in t_sampled:
+                axs[2].axvline(x=i, c = 'b', linestyle = '--', lw = '0.5', alpha = 0.66, zorder = 1)
+                #axs[2].axvline(x=i, c = 'r', linestyle = '--', lw = '0.5', alpha = 0.66, zorder = 1)
         
         ys_sampled = update_ys(ys_sampled, t_sampled, t_opt)
         t_sampled = update_ts(t_sampled, t_opt)
-    pl.show()
+    if SHOW_ITERATION_PLOTS:
+        pl.show()
 
 # %% [Entropy-selection summary heatmap]
 from matplotlib.colors import LinearSegmentedColormap, to_rgba
@@ -683,7 +690,8 @@ def plot_entropy_map(entropy_map, chosen_map, t_initial, N):
     One row per iteration. Unsampled time points are colored by entropy, min-max
     scaled within the row (raw entropy drifts as points are added): blue = low,
     red = high (turbo colormap). Black = the points picked in that iteration, gray = sampled in
-    an earlier iteration (or initially).
+    an earlier iteration. Iteration 0 shows the initial schedule (black) on light gray,
+    since no entropy is computed before the first iteration.
     """
     n_rows = len(chosen_map)
     rows = entropy_map[:n_rows]
@@ -695,24 +703,29 @@ def plot_entropy_map(entropy_map, chosen_map, t_initial, N):
     # turbo (rainbow, blue -> red), with its near-black ends trimmed so they
     # can't be confused with the black 'picked' cells
     heat = LinearSegmentedColormap.from_list('turbo_trim', pl.cm.turbo(np.linspace(0.08, 0.92, 256)))
-    surface, picked, earlier = '#fcfcfb', '#0b0b0b', '#a8a7a2'
+    surface, picked, earlier, no_entropy = '#fcfcfb', '#0b0b0b', '#a8a7a2', '#e4e3df'
 
     img = heat(np.nan_to_num(scaled))
     img[np.isnan(rows)] = to_rgba(earlier)
     for it, t_opt in chosen_map:
         img[it, t_opt] = to_rgba(picked)
 
+    # Iteration 0: initial schedule only
+    row0 = np.tile(to_rgba(no_entropy), (1, N, 1))
+    row0[0, t_initial] = to_rgba(picked)
+    img = np.concatenate([row0, img], axis=0)
+
     fig, ax = pl.subplots(figsize=(13, 0.26*n_rows + 2))
     fig.patch.set_facecolor(surface)
-    # origin='lower': iteration 1 at the bottom, later iterations stacked upward
+    # origin='lower': iteration 0 at the bottom, later iterations stacked upward
     ax.imshow(img, aspect='auto', interpolation='nearest', origin='lower',
-              extent=(-0.5, N - 0.5, 0.5, n_rows + 0.5))
+              extent=(-0.5, N - 0.5, -0.5, n_rows + 0.5))
     # Gaps between rows so each iteration reads as its own strip
-    for b in np.arange(1.5, n_rows + 0.5):
+    for b in np.arange(0.5, n_rows + 0.5):
         ax.axhline(b, color=surface, lw=1.5)
 
     ax.set_xlim(-0.5, N - 0.5)
-    ax.set_yticks([1] + list(range(5, n_rows + 1, 5)))
+    ax.set_yticks([0, 1] + list(range(5, n_rows + 1, 5)))
     ax.set_xlabel('Time point', color='#52514e')
     ax.set_ylabel('Iteration', color='#52514e')
     ax.set_title(f'Where entropy selects new points ({len(t_initial)} initial points, '
@@ -727,9 +740,10 @@ def plot_entropy_map(entropy_map, chosen_map, t_initial, N):
     cbar.set_label('Entropy of unsampled points, scaled per row', color='#52514e')
     cbar.outline.set_visible(False)
     cbar.ax.tick_params(colors='#52514e', length=0)
-    ax.legend(handles=[Patch(color=picked, label='Picked this iteration'),
-                       Patch(color=earlier, label='Sampled earlier')],
-              loc='upper left', bbox_to_anchor=(0, -0.07), ncol=2, frameon=False)
+    ax.legend(handles=[Patch(color=picked, label='Picked this iteration (iteration 0: initial points)'),
+                       Patch(color=earlier, label='Sampled earlier'),
+                       Patch(color=no_entropy, label='No entropy computed yet')],
+              loc='upper left', bbox_to_anchor=(0, -0.07), ncol=3, frameon=False)
     fig.tight_layout()
     pl.show()
     return(fig)
@@ -847,18 +861,19 @@ for i in range(0, num_iters):
         signal_to_noise_r[i,j] = m_post_r_maxima[i,j] / noise_update_r.item()
         
         
-    # Figure printing
-    fig, axs = pl.subplots(1,2, figsize=(15,5), gridspec_kw={'height_ratios': [1]})
+    if SHOW_ITERATION_PLOTS:
+        # Figure printing
+        fig, axs = pl.subplots(1,2, figsize=(15,5), gridspec_kw={'height_ratios': [1]})
     
-    axs[0].plot(np1,st1.real, c = 'b', lw='0.5',zorder=1)
-    axs[0].scatter(t_r_sampled, ys_r_post.real, c = 'lime', lw=0.5, edgecolor='k',alpha=0.5, zorder = 2)
-    axs[0].scatter(t_r_sampled, ys_r_sampled.real, c = 'r', lw=0.5, s=30, edgecolor='k', alpha=0.5, zorder=3)
-    axs[0].set_xlabel("Time point")
+        axs[0].plot(np1,st1.real, c = 'b', lw='0.5',zorder=1)
+        axs[0].scatter(t_r_sampled, ys_r_post.real, c = 'lime', lw=0.5, edgecolor='k',alpha=0.5, zorder = 2)
+        axs[0].scatter(t_r_sampled, ys_r_sampled.real, c = 'r', lw=0.5, s=30, edgecolor='k', alpha=0.5, zorder=3)
+        axs[0].set_xlabel("Time point")
     
-    axs[1].plot(ppm1,Sk1.real, c = 'b', zorder=1)
-    axs[1].plot(k_ppm1, m_r_post_scaled.real, c='r', zorder=2)
-    axs[1].scatter(peaks_ppm, m_post_r_maxima[i,:], c = 'cyan', edgecolor = 'k', lw = 0.5, zorder = 3)
-    axs[1].set_xlabel("15N Chemical Shift (ppm)")
+        axs[1].plot(ppm1,Sk1.real, c = 'b', zorder=1)
+        axs[1].plot(k_ppm1, m_r_post_scaled.real, c='r', zorder=2)
+        axs[1].scatter(peaks_ppm, m_post_r_maxima[i,:], c = 'cyan', edgecolor = 'k', lw = 0.5, zorder = 3)
+        axs[1].set_xlabel("15N Chemical Shift (ppm)")
     
     print("Iteration number:", i+1)    
     print("Number of sampled points:", t_r_sampled.shape[0])
@@ -875,7 +890,8 @@ for i in range(0, num_iters):
         ys_r_sampled = update_ys(ys_r_sampled, t_r_sampled, tr_opt)
         t_r_sampled = update_ts(t_r_sampled, tr_opt)
    
-    pl.show()
+    if SHOW_ITERATION_PLOTS:
+        pl.show()
 
 # %% [cell 20]
 normalized_maxima_r = normalize(m_post_r_maxima)
